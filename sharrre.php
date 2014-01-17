@@ -20,7 +20,7 @@
       $filtered = $domxpath->query("//div[@id='aggregateCount']");
       if (isset($filtered->item(0)->nodeValue))
       {
-        $json['count'] = str_replace('>', '', $filtered->item(0)->nodeValue);
+        $json['count'] = preg_replace('/[^0-9]/', '', $filtered->item(0)->nodeValue);
       }
     }
     else if($type == 'stumbleupon'){
