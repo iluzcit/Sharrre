@@ -62,10 +62,15 @@
         url: '',  //if you need to personalize url button
         urlCount: false,  //if you want to use personnalize button url on global counter
         count: 'horizontal',
+        showCount: true,
         hashtags: '',
         via: '',
         related: '',
-        lang: 'en'
+        lang: 'en',
+        action: 'share',
+        screenName: '',
+        showScreenName: false,
+        size: 'medium'
       },
       digg: { //http://about.digg.com/downloads/button/smart
         url: '',  //if you need to personalize url button
@@ -100,12 +105,15 @@
   urlJson = {
     googlePlus: "",
 
-	//new FQL method by Sire
-	facebook: "https://graph.facebook.com/fql?q=SELECT%20url,%20normalized_url,%20share_count,%20like_count,%20comment_count,%20total_count,commentsbox_count,%20comments_fbid,%20click_count%20FROM%20link_stat%20WHERE%20url=%27{url}%27&callback=?",
+  	//new FQL method by Sire
+  	facebook: "https://graph.facebook.com/fql?q=SELECT%20url,%20normalized_url,%20share_count,%20like_count,%20comment_count,%20total_count,commentsbox_count,%20comments_fbid,%20click_count%20FROM%20link_stat%20WHERE%20url=%27{url}%27&callback=?",
     //old method facebook: "http://graph.facebook.com/?id={url}&callback=?",
     //facebook : "http://api.ak.facebook.com/restserver.php?v=1.0&method=links.getStats&urls={url}&format=json"
     
-    twitter: "http://cdn.api.twitter.com/1/urls/count.json?url={url}&callback=?",
+    twitter: {
+      share: "http://cdn.api.twitter.com/1/urls/count.json?url={url}&callback=?",
+      follow: "https://cdn.api.twitter.com/1/users/show.json?screen_name={screen_name}&callback=?"
+    },
     digg: "http://services.digg.com/2.0/story.getInfo?links={url}&type=javascript&callback=?",
     delicious: 'http://feeds.delicious.com/v2/json/urlinfo/data?url={url}&callback=?',
     //stumbleupon: "http://www.stumbleupon.com/services/1.01/badge.getinfo?url={url}&format=jsonp&callback=?",
@@ -151,12 +159,16 @@
         }(document, 'script', 'facebook-jssdk'));
       }
       else{
-        FB.XFBML.parse();
+        FB.XFBML.parse();        
       }
     },
     twitter : function(self){
       var sett = self.options.buttons.twitter;
-      $(self.element).find('.buttons').append('<div class="button twitter"><a href="https://twitter.com/share" class="twitter-share-button" data-url="'+(sett.url !== '' ? sett.url : self.options.url)+'" data-count="'+sett.count+'" data-text="'+self.options.text+'" data-via="'+sett.via+'" data-hashtags="'+sett.hashtags+'" data-related="'+sett.related+'" data-lang="'+sett.lang+'">Tweet</a></div>');
+      if(sett.action == 'share'){
+        $(self.element).find('.buttons').append('<div class="button twitter"><a href="https://twitter.com/share" class="twitter-share-button" data-url="'+(sett.url !== '' ? sett.url : self.options.url)+'" data-count="'+sett.count+'" data-text="'+self.options.text+'" data-via="'+sett.via+'" data-hashtags="'+sett.hashtags+'" data-related="'+sett.related+'" data-lang="'+sett.lang+'">Tweet</a></div>');
+      } else if(sett.action == 'follow'){
+        $(self.element).find('.buttons').append('<div class="button twitter"><a href="https://twitter.com/' + sett.screenName + '" class="twitter-follow-button" data-show-count="' + sett.showCount + '" data-size="' + sett.size + '" data-lang="' + sett.lang + '" data-show-screen-name="' + sett.showScreenName + '">Follow me</a></div>');
+      }
       var loading = 0;
       if(typeof twttr === 'undefined' && loading == 0){
         loading = 1;
@@ -443,10 +455,20 @@
   Plugin.prototype.getSocialJson = function (name) {
     var self = this,
     count = 0,
-    url = urlJson[name].replace('{url}', encodeURIComponent(this.options.url));
-    if(this.options.buttons[name].urlCount === true && this.options.buttons[name].url !== ''){
-      url = urlJson[name].replace('{url}', this.options.buttons[name].url);
+    baseUrl = '',
+    url = '';
+
+    if(name == 'twitter'){
+      baseUrl = urlJson[name][this.options.buttons[name].action].replace('{screen_name}', this.options.buttons[name].screenName);
+    }else{
+      baseUrl = urlJson[name];
     }
+
+    url = baseUrl.replace('{url}', encodeURIComponent(this.options.url));
+    if(this.options.buttons[name].urlCount === true && this.options.buttons[name].url !== ''){
+      url = baseUrl.replace('{url}', this.options.buttons[name].url);
+    }
+
     //console.log('name : ' + name + ' - url : '+url); //debug
     if(url != '' && self.options.urlCurl !== ''){  //urlCurl = '' if you don't want to used PHP script but used social button
       $.getJSON(url, function(json){
@@ -455,7 +477,10 @@
           temp = temp.replace('\u00c2\u00a0', '');  //remove google plus special chars
           count += parseInt(temp, 10);
         }
-		//get the FB total count (shares, likes and more)
+        else if(typeof json.followers_count != "undefined"){
+          count += json.followers_count;
+        }
+		    //get the FB total count (shares, likes and more)
         else if(json.data && json.data.length > 0 && typeof json.data[0].total_count !== "undefined"){ //Facebook total count
           count += parseInt(json.data[0].total_count, 10);
         }
@@ -530,6 +555,7 @@
   ================================================== */
   Plugin.prototype.openPopup = function (site) {
     popup[site](this.options);  //open
+
     if(this.options.enableTracking === true){ //tracking!
       var tracking = {
         googlePlus: {site: 'Google', action: '+1'},
